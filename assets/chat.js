@@ -3,7 +3,6 @@ let messageCache = new Map();
 let ws = null;
 let reconnectAttempts = 0;
 const MAX_RECONNECT_ATTEMPTS = 5;
-let isTyping = false;
 
 // UI Elements
 const messageInput = document.getElementById('messageInput');
@@ -22,6 +21,7 @@ messageInput.addEventListener('input', adjustTextareaHeight);
 function updateConnectionStatus(status) {
     const statusElement = document.querySelector('.connection-status');
     if (!statusElement) return;
+    
     statusElement.className = 'connection-status ' + status;
     
     switch(status) {
@@ -73,11 +73,6 @@ function connectWebSocket() {
         try {
             const data = JSON.parse(event.data);
             handleWebSocketMessage(data);
-            // Try to parse state from data
-            if (data.state) {
-                const state = JSON.parse(data.state);
-                updateTitle(state);
-            }
         } catch (error) {
             console.error('Error parsing WebSocket message:', error);
         }
@@ -93,6 +88,28 @@ function sendWebSocketMessage(message) {
     }
 }
 
+function handleWebSocketMessage(data) {
+    if (data.type === 'message_update' && data.messages) {
+        // Update message cache with new messages
+        data.messages.forEach(msg => {
+            messageCache.set(msg.id, msg);
+        });
+        
+        // Remove any temporary messages
+        for (const [id, msg] of messageCache.entries()) {
+            if (id.startsWith('temp-')) {
+                messageCache.delete(id);
+            }
+        }
+        
+        // Render messages without typing indicator
+        renderMessages(Array.from(messageCache.values()), false);
+        
+        // Update head ID if present
+        updateHeadId(Array.from(messageCache.values()));
+    }
+}
+
 // Update head ID in title
 function updateHeadId(messages) {
     const headElement = document.querySelector('.head-id');
@@ -101,30 +118,6 @@ function updateHeadId(messages) {
         headElement.textContent = `Head: ${lastMessage.id.slice(0, 8)}...`;
     } else {
         headElement.textContent = 'Head: None';
-    }
-}
-
-function updateTitle(state) {
-    const titleElement = document.querySelector('.title');
-    if (titleElement && state.title) {
-        titleElement.textContent = state.title;
-    }
-}
-
-function handleWebSocketMessage(data) {
-    // Handle full message history
-    if (data.type === 'message_update' && data.messages) {
-        // Hide both loading and typing indicators
-        hideTypingIndicator();
-        hideLoading();
-        
-        // Add new messages to cache
-        data.messages.forEach(msg => {
-            messageCache.set(msg.id, msg);
-        });
-        // Render all messages from cache
-        renderMessages(Array.from(messageCache.values()));
-        updateHeadId(Array.from(messageCache.values()));
     }
 }
 
@@ -139,9 +132,19 @@ async function sendMessage() {
         messageInput.disabled = true;
         sendButton.disabled = true;
 
-        // Show typing indicator before sending message
-        showTypingIndicator();
+        // Create and show user message immediately
+        const userMsg = {
+            role: 'user',
+            content: text,
+            id: 'temp-' + Date.now(),
+            parent: null
+        };
+        messageCache.set(userMsg.id, userMsg);
+        
+        // Show messages with typing indicator
+        renderMessages([...messageCache.values()], true);
 
+        // Send message to server
         sendWebSocketMessage({
             type: 'send_message',
             content: text
@@ -152,7 +155,6 @@ async function sendMessage() {
         messageInput.focus();
     } catch (error) {
         console.error('Error sending message:', error);
-        hideTypingIndicator();
         alert('Failed to send message. Please try again.');
     } finally {
         messageInput.disabled = false;
@@ -160,7 +162,7 @@ async function sendMessage() {
     }
 }
 
-function renderMessages(messages) {
+function renderMessages(messages, isTyping = false) {
     // Sort messages by their sequence in the chat
     const sortedMessages = messages.sort((a, b) => {
         // If a message has a parent, it comes after that parent
@@ -169,7 +171,7 @@ function renderMessages(messages) {
         return 0;
     });
 
-    if (sortedMessages.length === 0) {
+    if (sortedMessages.length === 0 && !isTyping) {
         messageArea.innerHTML = `
             <div class="empty-state">
                 No messages yet.<br>Start the conversation!
@@ -178,7 +180,6 @@ function renderMessages(messages) {
         return;
     }
 
-    // Add messages
     messageArea.innerHTML = `
         <div class="message-container">
             ${sortedMessages.map(msg => `
@@ -186,44 +187,17 @@ function renderMessages(messages) {
                     ${formatMessage(msg.content)}
                 </div>
             `).join('')}
-            <div class="typing-indicator">
-                <span></span>
-                <span></span>
-                <span></span>
-            </div>
+            ${isTyping ? `
+                <div class="typing-indicator">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </div>
+            ` : ''}
         </div>
     `;
 
     messageArea.scrollTop = messageArea.scrollHeight;
-}
-
-// Typing indicator management
-function showTypingIndicator() {
-    if (!isTyping) {
-        isTyping = true;
-        const typingIndicator = messageArea.querySelector('.typing-indicator');
-        if (typingIndicator) {
-            typingIndicator.classList.add('visible');
-            messageArea.scrollTop = messageArea.scrollHeight;
-        }
-    }
-}
-
-function hideTypingIndicator() {
-    isTyping = false;
-    const typingIndicator = messageArea.querySelector('.typing-indicator');
-    if (typingIndicator) {
-        typingIndicator.classList.remove('visible');
-    }
-}
-
-// Loading state management
-function showLoading() {
-    loadingOverlay.classList.add('show');
-}
-
-function hideLoading() {
-    loadingOverlay.classList.remove('show');
 }
 
 // Message formatting
@@ -261,9 +235,6 @@ document.addEventListener('DOMContentLoaded', () => {
             sendMessage();
         }
     });
-
-    // Show initial loading state
-    showLoading();
 });
 
 // Handle visibility changes
