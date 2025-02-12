@@ -3,10 +3,12 @@ let messageCache = new Map();
 let ws = null;
 let reconnectAttempts = 0;
 const MAX_RECONNECT_ATTEMPTS = 5;
+let isTyping = false;
 
 // UI Elements
 const messageInput = document.getElementById('messageInput');
 const messageArea = document.getElementById('messageArea');
+const loadingOverlay = document.getElementById('messageLoading');
 
 // Auto-resize textarea
 function adjustTextareaHeight() {
@@ -88,12 +90,15 @@ function sendWebSocketMessage(message) {
 function handleWebSocketMessage(data) {
     // Handle full message history
     if (data.type === 'message_update' && data.messages) {
-        // Clear and rebuild message cache
-        messageCache.clear();
+        // Hide both loading and typing indicators
+        hideTypingIndicator();
+        hideLoading();
+        
+        // Add new messages to cache
         data.messages.forEach(msg => {
             messageCache.set(msg.id, msg);
         });
-        // Render all messages
+        // Render all messages from cache
         renderMessages(Array.from(messageCache.values()));
     }
 }
@@ -109,6 +114,9 @@ async function sendMessage() {
         messageInput.disabled = true;
         sendButton.disabled = true;
 
+        // Show typing indicator before sending message
+        showTypingIndicator();
+
         sendWebSocketMessage({
             type: 'send_message',
             content: text
@@ -119,6 +127,7 @@ async function sendMessage() {
         messageInput.focus();
     } catch (error) {
         console.error('Error sending message:', error);
+        hideTypingIndicator();
         alert('Failed to send message. Please try again.');
     } finally {
         messageInput.disabled = false;
@@ -144,15 +153,52 @@ function renderMessages(messages) {
         return;
     }
 
-    messageArea.innerHTML = `<div class="message-container">${
-        messages.map(msg => `
-            <div class="message ${msg.role}" data-id="${msg.id}">
-                ${formatMessage(msg.content)}
+    // Add messages
+    messageArea.innerHTML = `
+        <div class="message-container">
+            ${sortedMessages.map(msg => `
+                <div class="message ${msg.role}" data-id="${msg.id}">
+                    ${formatMessage(msg.content)}
+                </div>
+            `).join('')}
+            <div class="typing-indicator">
+                <span></span>
+                <span></span>
+                <span></span>
             </div>
-        `).join('')
-    }</div>`;
+        </div>
+    `;
 
     messageArea.scrollTop = messageArea.scrollHeight;
+}
+
+// Typing indicator management
+function showTypingIndicator() {
+    if (!isTyping) {
+        isTyping = true;
+        const typingIndicator = messageArea.querySelector('.typing-indicator');
+        if (typingIndicator) {
+            typingIndicator.classList.add('visible');
+            messageArea.scrollTop = messageArea.scrollHeight;
+        }
+    }
+}
+
+function hideTypingIndicator() {
+    isTyping = false;
+    const typingIndicator = messageArea.querySelector('.typing-indicator');
+    if (typingIndicator) {
+        typingIndicator.classList.remove('visible');
+    }
+}
+
+// Loading state management
+function showLoading() {
+    loadingOverlay.classList.add('show');
+}
+
+function hideLoading() {
+    loadingOverlay.classList.remove('show');
 }
 
 // Message formatting
@@ -190,6 +236,9 @@ document.addEventListener('DOMContentLoaded', () => {
             sendMessage();
         }
     });
+
+    // Show initial loading state
+    showLoading();
 });
 
 // Handle visibility changes
