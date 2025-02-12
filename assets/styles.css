@@ -50,6 +50,20 @@ body {
     font-size: 1.1rem;
     font-weight: 600;
     color: var(--gray-800);
+    cursor: pointer;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    transition: background-color 0.2s;
+}
+
+.title:hover {
+    background: var(--gray-100);
+}
+
+.title.editing {
+    background: white;
+    border: 1px solid var(--gray-300);
+    outline: none;
 }
 
 .title-info {
