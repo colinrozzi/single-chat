@@ -20,7 +20,8 @@ messageInput.addEventListener('input', adjustTextareaHeight);
 
 // WebSocket connection management
 function updateConnectionStatus(status) {
-    const statusElement = document.getElementById('connectionStatus');
+    const statusElement = document.querySelector('.connection-status');
+    if (!statusElement) return;
     statusElement.className = 'connection-status ' + status;
     
     switch(status) {
@@ -72,6 +73,11 @@ function connectWebSocket() {
         try {
             const data = JSON.parse(event.data);
             handleWebSocketMessage(data);
+            // Try to parse state from data
+            if (data.state) {
+                const state = JSON.parse(data.state);
+                updateTitle(state);
+            }
         } catch (error) {
             console.error('Error parsing WebSocket message:', error);
         }
@@ -84,6 +90,24 @@ function sendWebSocketMessage(message) {
     } else {
         console.warn('WebSocket not connected');
         updateConnectionStatus('disconnected');
+    }
+}
+
+// Update head ID in title
+function updateHeadId(messages) {
+    const headElement = document.querySelector('.head-id');
+    if (messages && messages.length > 0) {
+        const lastMessage = messages[messages.length - 1];
+        headElement.textContent = `Head: ${lastMessage.id.slice(0, 8)}...`;
+    } else {
+        headElement.textContent = 'Head: None';
+    }
+}
+
+function updateTitle(state) {
+    const titleElement = document.querySelector('.title');
+    if (titleElement && state.title) {
+        titleElement.textContent = state.title;
     }
 }
 
@@ -100,6 +124,7 @@ function handleWebSocketMessage(data) {
         });
         // Render all messages from cache
         renderMessages(Array.from(messageCache.values()));
+        updateHeadId(Array.from(messageCache.values()));
     }
 }
 

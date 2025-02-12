@@ -36,8 +36,14 @@ struct AnthropicMessage {
 
 // Simplified state for single chat
 #[derive(Serialize, Deserialize, Debug, Clone)]
-struct State {
+struct Chat {
+    title: String,
     head: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+struct State {
+    chat: Chat,
     api_key: String,
     connected_clients: HashMap<String, bool>,
 }
@@ -155,6 +161,7 @@ impl ActorGuest for Component {
             head: None,
             api_key,
             connected_clients: HashMap::new(),
+            title: "Claude Chat".to_string(),
         };
 
         // Ensure directories exist
