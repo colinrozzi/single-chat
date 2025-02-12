@@ -140,16 +140,6 @@ impl State {
         Ok(messages)
     }
 
-    fn load_chat() -> Result<Chat, Box<dyn std::error::Error>> {
-        let path = "data/chats/chat.json";
-        if path_exists(path).unwrap_or(false) {
-            let content = read_file(path).unwrap();
-            Ok(serde_json::from_slice(&content)?)
-        } else {
-            Ok(Chat { head: None })
-        }
-    }
-
     fn update_head(&mut self, message_id: String) -> Result<(), Box<dyn std::error::Error>> {
         self.chat.head = Some(message_id);
         Ok(())
@@ -202,6 +192,7 @@ impl State {
 #[derive(Serialize, Deserialize, Debug)]
 struct InitData {
     key_value_actor: String,
+    head: Option<String>,
 }
 
 struct Component;
@@ -221,7 +212,9 @@ impl ActorGuest for Component {
         let api_key = String::from_utf8(api_key).unwrap().trim().to_string();
 
         // Load or create chat
-        let chat = State::load_chat().unwrap_or_else(|_| Chat { head: None });
+        let chat = Chat {
+            head: init_data.head,
+        };
 
         let initial_state = State {
             chat,
