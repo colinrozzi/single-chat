@@ -1378,13 +1378,23 @@ pub mod exports {
                 #[doc(hidden)]
                 #[allow(non_snake_case)]
                 pub unsafe fn _export_init_cabi<T: Guest>(
-                    arg0: *mut u8,
-                    arg1: usize,
+                    arg0: i32,
+                    arg1: *mut u8,
+                    arg2: usize,
                 ) -> *mut u8 {
                     #[cfg(target_arch = "wasm32")] _rt::run_ctors_once();
-                    let len0 = arg1;
                     let result1 = T::init(
-                        _rt::Vec::from_raw_parts(arg0.cast(), len0, len0),
+                        match arg0 {
+                            0 => None,
+                            1 => {
+                                let e = {
+                                    let len0 = arg2;
+                                    _rt::Vec::from_raw_parts(arg1.cast(), len0, len0)
+                                };
+                                Some(e)
+                            }
+                            _ => _rt::invalid_enum_discriminant(),
+                        },
                     );
                     let ptr2 = _RET_AREA.0.as_mut_ptr().cast::<u8>();
                     let vec3 = (result1).into_boxed_slice();
@@ -1405,15 +1415,15 @@ pub mod exports {
                     _rt::cabi_dealloc(base2, len2 * 1, 1);
                 }
                 pub trait Guest {
-                    fn init(data: Json) -> Json;
+                    fn init(data: Option<Json>) -> Json;
                 }
                 #[doc(hidden)]
                 macro_rules! __export_ntwk_theater_actor_cabi {
                     ($ty:ident with_types_in $($path_to_types:tt)*) => {
                         const _ : () = { #[export_name = "ntwk:theater/actor#init"]
-                        unsafe extern "C" fn export_init(arg0 : * mut u8, arg1 : usize,)
-                        -> * mut u8 { $($path_to_types)*:: _export_init_cabi::<$ty >
-                        (arg0, arg1) } #[export_name =
+                        unsafe extern "C" fn export_init(arg0 : i32, arg1 : * mut u8,
+                        arg2 : usize,) -> * mut u8 { $($path_to_types)*::
+                        _export_init_cabi::<$ty > (arg0, arg1, arg2) } #[export_name =
                         "cabi_post_ntwk:theater/actor#init"] unsafe extern "C" fn
                         _post_return_init(arg0 : * mut u8,) { $($path_to_types)*::
                         __post_return_init::<$ty > (arg0) } };
@@ -1774,8 +1784,8 @@ pub(crate) use __export_single_chat_impl as export;
 #[cfg(target_arch = "wasm32")]
 #[link_section = "component-type:wit-bindgen:0.36.0:ntwk:theater:single-chat:encoded world"]
 #[doc(hidden)]
-pub static __WIT_BINDGEN_COMPONENT_TYPE: [u8; 1821] = *b"\
-\0asm\x0d\0\x01\0\0\x19\x16wit-component-encoding\x04\0\x07\x9b\x0d\x01A\x02\x01\
+pub static __WIT_BINDGEN_COMPONENT_TYPE: [u8; 1824] = *b"\
+\0asm\x0d\0\x01\0\0\x19\x16wit-component-encoding\x04\0\x07\x9e\x0d\x01A\x02\x01\
 A\x1b\x01B\x0e\x01p}\x04\0\x04json\x03\0\0\x01p}\x04\0\x05state\x03\0\x02\x01s\x04\
 \0\x08actor-id\x03\0\x04\x01kw\x01r\x03\x0aevent-types\x06parent\x06\x04data\x01\
 \x04\0\x05event\x03\0\x07\x01r\x02\x04hashw\x05event\x08\x04\0\x0ameta-event\x03\
@@ -1811,15 +1821,15 @@ binary\0\0\x07connect\0\0\x05close\0\0\x04ping\0\0\x04pong\0\0\x05other\x01s\0\x
 text\x04\x04\0\x11websocket-message\x03\0\x05\x01p\x06\x01r\x01\x08messages\x07\x04\
 \0\x12websocket-response\x03\0\x08\x01o\x02\x02\x09\x01@\x02\x07message\x06\x05s\
 tate\x02\0\x0a\x04\0\x0ehandle-message\x01\x0b\x04\0\x1dntwk:theater/websocket-s\
-erver\x05\x0d\x01B\x06\x02\x03\x02\x01\x01\x04\0\x04json\x03\0\0\x02\x03\x02\x01\
-\x0b\x04\0\x05event\x03\0\x02\x01@\x01\x04data\x01\0\x01\x04\0\x04init\x01\x04\x04\
-\0\x12ntwk:theater/actor\x05\x0e\x02\x03\0\0\x05state\x01B\x09\x02\x03\x02\x01\x0f\
-\x04\0\x05state\x03\0\0\x02\x03\x02\x01\x08\x04\0\x0chttp-request\x03\0\x02\x02\x03\
-\x02\x01\x09\x04\0\x0dhttp-response\x03\0\x04\x01o\x02\x05\x01\x01@\x02\x03req\x03\
-\x05state\x01\0\x06\x04\0\x0ehandle-request\x01\x07\x04\0\x18ntwk:theater/http-s\
-erver\x05\x10\x04\0\x18ntwk:theater/single-chat\x04\0\x0b\x11\x01\0\x0bsingle-ch\
-at\x03\0\0\0G\x09producers\x01\x0cprocessed-by\x02\x0dwit-component\x070.220.1\x10\
-wit-bindgen-rust\x060.36.0";
+erver\x05\x0d\x01B\x07\x02\x03\x02\x01\x01\x04\0\x04json\x03\0\0\x02\x03\x02\x01\
+\x0b\x04\0\x05event\x03\0\x02\x01k\x01\x01@\x01\x04data\x04\0\x01\x04\0\x04init\x01\
+\x05\x04\0\x12ntwk:theater/actor\x05\x0e\x02\x03\0\0\x05state\x01B\x09\x02\x03\x02\
+\x01\x0f\x04\0\x05state\x03\0\0\x02\x03\x02\x01\x08\x04\0\x0chttp-request\x03\0\x02\
+\x02\x03\x02\x01\x09\x04\0\x0dhttp-response\x03\0\x04\x01o\x02\x05\x01\x01@\x02\x03\
+req\x03\x05state\x01\0\x06\x04\0\x0ehandle-request\x01\x07\x04\0\x18ntwk:theater\
+/http-server\x05\x10\x04\0\x18ntwk:theater/single-chat\x04\0\x0b\x11\x01\0\x0bsi\
+ngle-chat\x03\0\0\0G\x09producers\x01\x0cprocessed-by\x02\x0dwit-component\x070.\
+220.1\x10wit-bindgen-rust\x060.36.0";
 #[inline(never)]
 #[doc(hidden)]
 pub fn __link_custom_section_describing_imports() {

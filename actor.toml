@@ -1,8 +1,8 @@
 name = "single-chat"
 version = "0.1.0"
 description = "Single chat actor for LLM chat application"
-
 component_path = "/Users/colinrozzi/work/actors/single-chat/target/wasm32-unknown-unknown/release/single_chat.wasm"
+init_data = "/Users/colinrozzi/work/actors/single-chat/assets/init.json"
 
 [interface]
 implements = "ntwk:theater/single-actor"

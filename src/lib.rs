@@ -114,9 +114,13 @@ impl State {
         let response: Value = serde_json::from_slice(&response_bytes)?;
         if response["status"].as_str() == Some("ok") {
             if let Some(value) = response.get("value") {
-                if let Some(value_array) = value.as_array() {
-                    return Ok(serde_json::from_slice(&value_array)?);
-                }
+                // The value should already be the serialized message bytes
+                let value_bytes = value.as_array().ok_or("Expected byte array")?;
+                let bytes: Vec<u8> = value_bytes
+                    .iter()
+                    .map(|v| v.as_u64().unwrap_or(0) as u8)
+                    .collect();
+                return Ok(serde_json::from_slice(&bytes)?);
             }
         }
         Err("Failed to load message".into())
@@ -194,11 +198,22 @@ impl State {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+struct InitData {
+    key_value_actor: String,
+}
+
 struct Component;
 
 impl ActorGuest for Component {
-    fn init(_data: Vec<u8>) -> Vec<u8> {
+    fn init(data: Option<Vec<u8>>) -> Vec<u8> {
         log("Initializing single chat actor");
+        let data = data.unwrap();
+        log(&format!("Data: {:?}", data));
+
+        let init_data: InitData = serde_json::from_slice(&data).unwrap();
+
+        log(&format!("Key value actor: {}", init_data.key_value_actor));
 
         // Read API key
         let api_key = read_file("api-key.txt").unwrap();
@@ -211,7 +226,7 @@ impl ActorGuest for Component {
             chat,
             api_key,
             connected_clients: HashMap::new(),
-            key_value_actor: "key-value-store".to_string(),
+            key_value_actor: init_data.key_value_actor,
         };
 
         serde_json::to_vec(&initial_state).unwrap()
