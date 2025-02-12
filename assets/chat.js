@@ -1,38 +1,3 @@
-// Title editing
-function startEditingTitle() {
-    const titleElement = document.querySelector('.title');
-    const currentTitle = titleElement.textContent;
-    titleElement.contentEditable = true;
-    titleElement.classList.add('editing');
-    titleElement.focus();
-
-    // Save on enter or blur
-    titleElement.addEventListener('keydown', function titleKeydown(e) {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            titleElement.blur();
-        }
-        if (e.key === 'Escape') {
-            titleElement.textContent = currentTitle;
-            titleElement.blur();
-        }
-    });
-
-    titleElement.addEventListener('blur', function titleBlur() {
-        const newTitle = titleElement.textContent.trim();
-        if (newTitle && newTitle !== currentTitle) {
-            sendWebSocketMessage({
-                type: 'update_title',
-                title: newTitle
-            });
-        } else {
-            titleElement.textContent = currentTitle;
-        }
-        titleElement.contentEditable = false;
-        titleElement.classList.remove('editing');
-    }, { once: true });
-}
-
 // State management
 let messageCache = new Map();
 let ws = null;

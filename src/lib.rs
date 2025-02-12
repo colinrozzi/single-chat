@@ -35,7 +35,6 @@ struct AnthropicMessage {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 struct Chat {
-    title: String,
     head: Option<String>,
 }
 
@@ -107,20 +106,12 @@ impl State {
             let content = read_file(path).unwrap();
             Ok(serde_json::from_slice(&content)?)
         } else {
-            Ok(Chat {
-                title: "Claude Chat".to_string(),
-                head: None,
-            })
+            Ok(Chat { head: None })
         }
     }
 
     fn update_head(&mut self, message_id: String) -> Result<(), Box<dyn std::error::Error>> {
         self.chat.head = Some(message_id);
-        self.save_chat()
-    }
-
-    fn update_title(&mut self, title: String) -> Result<(), Box<dyn std::error::Error>> {
-        self.chat.title = title;
         self.save_chat()
     }
 
@@ -186,10 +177,7 @@ impl ActorGuest for Component {
         let api_key = String::from_utf8(api_key).unwrap().trim().to_string();
 
         // Load or create chat
-        let chat = State::load_chat().unwrap_or_else(|_| Chat {
-            title: "Claude Chat".to_string(),
-            head: None,
-        });
+        let chat = State::load_chat().unwrap_or_else(|_| Chat { head: None });
 
         let initial_state = State {
             chat,
@@ -355,28 +343,6 @@ impl WebSocketGuest for Component {
                                     }
                                 }
                             }
-                            Some("update_title") => {
-                                if let Some(title) = command["title"].as_str() {
-                                    if current_state.update_title(title.to_string()).is_ok() {
-                                        return (
-                                            serde_json::to_vec(&current_state).unwrap(),
-                                            WebsocketResponse {
-                                                messages: vec![WebsocketMessage {
-                                                    ty: MessageType::Text,
-                                                    text: Some(
-                                                        serde_json::json!({
-                                                            "type": "state_update",
-                                                            "chat": current_state.chat
-                                                        })
-                                                        .to_string(),
-                                                    ),
-                                                    data: None,
-                                                }],
-                                            },
-                                        );
-                                    }
-                                }
-                            }
                             Some("get_messages") => {
                                 if let Ok(messages) = current_state.get_message_history() {
                                     return (
@@ -431,4 +397,3 @@ impl MessageServerClientGuest for Component {
 }
 
 bindings::export!(Component with_types_in bindings);
-
