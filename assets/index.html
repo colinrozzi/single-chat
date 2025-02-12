@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LLM Chat</title>
+    <title>Single Chat</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -11,36 +11,7 @@
         Disconnected
     </div>
 
-    <div id="newChatModal" class="modal">
-        <div class="modal-content">
-            <h3 class="modal-title">Create New Chat</h3>
-            <input type="text" id="newChatTitle" class="message-input" placeholder="Enter chat title">
-            <div class="modal-buttons">
-                <button onclick="closeNewChatModal()" class="modal-button"
-                    style="padding: 0.5rem 1rem; color: var(--gray-700)">Cancel</button>
-                <button onclick="submitNewChat()" class="send-button">Create</button>
-            </div>
-        </div>
-    </div>
-
     <div class="container">
-        <div class="sidebar">
-            <button onclick="showNewChatModal()" class="new-chat-btn">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                    <path d="M12 5v14m-7-7h14" stroke-width="2" stroke-linecap="round" />
-                </svg>
-                New Chat
-            </button>
-            <div class="chat-list-container">
-                <div id="chatListLoading" class="loading-overlay">
-                    Loading chats...
-                </div>
-                <div id="chatList" class="chat-list">
-                    <!-- Chat items will be rendered here -->
-                </div>
-            </div>
-        </div>
-
         <div class="main-chat">
             <div class="message-area-container">
                 <div id="messageLoading" class="loading-overlay">

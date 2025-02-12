@@ -1,6 +1,4 @@
 // State management
-let currentChatTitle = null;
-let currentMessageParentId = null;
 let messageCache = new Map();
 let ws = null;
 let reconnectAttempts = 0;
@@ -40,7 +38,6 @@ function connectWebSocket() {
     updateConnectionStatus('connecting');
     
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    //const wsUrl = `${protocol}//${window.location.host}/`;
     const wsUrl = 'ws://localhost:8082/';
     
     ws = new WebSocket(wsUrl);
@@ -49,9 +46,9 @@ function connectWebSocket() {
         console.log('WebSocket connected');
         updateConnectionStatus('connected');
         reconnectAttempts = 0;
-        // Request initial data
+        // Request initial messages
         sendWebSocketMessage({
-            type: 'get_all'
+            type: 'get_messages'
         });
     };
     
@@ -89,65 +86,13 @@ function sendWebSocketMessage(message) {
 }
 
 function handleWebSocketMessage(data) {
-    if (data.status === 'success') {
-        // Update message cache
-        if (data.messages) {
-            data.messages.forEach(msg => {
-                messageCache.set(msg.id, msg);
-            });
-        }
-        
-        // Update chat list if present
-        if (data.chats) {
-            renderChatList(data.chats);
-            
-            // Handle chat selection
-            if (currentChatTitle) {
-                const currentChat = data.chats.find(c => c.title === currentChatTitle);
-                if (currentChat) {
-                    selectChat(currentChat.title, currentChat.head);
-                }
-            } else if (data.chats.length > 0) {
-                selectChat(data.chats[0].title, data.chats[0].head);
-            }
-        }
-
-        // Handle message updates
-        if (data.type === 'message_update' && data.chat_id === currentChatTitle) {
-            data.messages.forEach(msg => {
-                messageCache.set(msg.id, msg);
-            });
-            if (currentChatTitle) {
-                const messages = buildMessageChain(data.messages[data.messages.length - 1].id);
-                renderMessages(messages);
-            }
-        }
+    if (data.type === 'message_update' && data.messages) {
+        // Update message cache and render
+        data.messages.forEach(msg => {
+            messageCache.set(msg.id, msg);
+        });
+        renderMessages(data.messages);
     }
-}
-
-// Modal functions
-function showNewChatModal() {
-    document.getElementById('newChatModal').classList.add('show');
-    document.getElementById('newChatTitle').focus();
-}
-
-function closeNewChatModal() {
-    document.getElementById('newChatModal').classList.remove('show');
-    document.getElementById('newChatTitle').value = '';
-}
-
-// Chat creation
-async function submitNewChat() {
-    const titleInput = document.getElementById('newChatTitle');
-    const title = titleInput.value.trim();
-    if (!title) return;
-
-    sendWebSocketMessage({
-        type: 'new_chat',
-        title: title
-    });
-    
-    closeNewChatModal();
 }
 
 // Message handling
@@ -155,7 +100,7 @@ async function sendMessage() {
     const text = messageInput.value.trim();
     const sendButton = document.querySelector('.send-button');
 
-    if (!text || !currentChatTitle) return;
+    if (!text) return;
 
     try {
         messageInput.disabled = true;
@@ -163,8 +108,7 @@ async function sendMessage() {
 
         sendWebSocketMessage({
             type: 'send_message',
-            content: text,
-            chat_id: currentChatTitle
+            content: text
         });
 
         messageInput.value = '';
@@ -177,62 +121,6 @@ async function sendMessage() {
         messageInput.disabled = false;
         sendButton.disabled = false;
     }
-}
-
-// Build the message chain from head to root
-function buildMessageChain(headId) {
-    const messages = [];
-    let currentId = headId;
-
-    while (currentId) {
-        const message = messageCache.get(currentId);
-        if (!message) break;
-        messages.unshift(message);
-        currentId = message.parent;
-    }
-
-    return messages;
-}
-
-// Chat selection and message rendering
-function selectChat(title, headId) {
-    currentChatTitle = title;
-    currentMessageParentId = headId;
-
-    const messages = buildMessageChain(headId);
-    renderMessages(messages);
-
-    // Update UI to show active chat
-    document.querySelectorAll('.chat-item').forEach(chat => {
-        if (chat.textContent.trim() === title) {
-            chat.classList.add('active');
-        } else {
-            chat.classList.remove('active');
-        }
-    });
-
-    // Focus message input
-    messageInput.focus();
-}
-
-function renderChatList(chats) {
-    const chatList = document.getElementById('chatList');
-
-    if (chats.length === 0) {
-        chatList.innerHTML = `
-            <div class="empty-state">
-                No chats yet.<br>Create your first chat!
-            </div>
-        `;
-        return;
-    }
-
-    chatList.innerHTML = chats.map(chat => `
-        <div onclick="selectChat('${escapeHtml(chat.title)}', '${chat.head}')"
-             class="chat-item ${chat.title === currentChatTitle ? 'active' : ''}">
-            <span>${escapeHtml(chat.title)}</span>
-        </div>
-    `).join('');
 }
 
 function renderMessages(messages) {
@@ -289,17 +177,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (event.key === 'Enter' && !event.shiftKey) {
             event.preventDefault();
             sendMessage();
-        }
-    });
-
-    // Handle "new chat" modal
-    document.getElementById('newChatTitle').addEventListener('keydown', (event) => {
-        if (event.key === 'Enter') {
-            event.preventDefault();
-            submitNewChat();
-        }
-        if (event.key === 'Escape') {
-            closeNewChatModal();
         }
     });
 });

@@ -148,6 +148,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "single-chat"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "sha1",
+ "wit-bindgen-rt",
+]
+
+[[package]]
 name = "syn"
 version = "2.0.98"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -169,16 +179,6 @@ name = "unicode-ident"
 version = "1.0.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a210d160f08b701c8721ba1c726c11662f877ea6b7094007e1ca9a1041945034"
-
-[[package]]
-name = "unified-chat"
-version = "0.1.0"
-dependencies = [
- "serde",
- "serde_json",
- "sha1",
- "wit-bindgen-rt",
-]
 
 [[package]]
 name = "version_check"

@@ -1,11 +1,11 @@
-name = "unified-chat"
+name = "single-chat"
 version = "0.1.0"
-description = "Unified chat actor for LLM chat application"
+description = "Single chat actor for LLM chat application"
 
-component_path = "/Users/colinrozzi/work/actors/unified-chat/target/wasm32-unknown-unknown/release/unified_chat.wasm"
+component_path = "/Users/colinrozzi/work/actors/single-chat/target/wasm32-unknown-unknown/release/single_chat.wasm"
 
 [interface]
-implements = "ntwk:theater/unified-actor"
+implements = "ntwk:theater/single-actor"
 requires = []
 
 [[handlers]]
@@ -14,7 +14,7 @@ config = {}
 
 [[handlers]]
 type = "filesystem"
-config = { path = "/Users/colinrozzi/work/actors/unified-chat/assets"}
+config = { path = "/Users/colinrozzi/work/actors/single-chat/assets"}
 
 [[handlers]]
 type = "http-server"

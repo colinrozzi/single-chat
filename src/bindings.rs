@@ -1743,7 +1743,7 @@ mod _rt {
 /// ```
 #[allow(unused_macros)]
 #[doc(hidden)]
-macro_rules! __export_unified_chat_impl {
+macro_rules! __export_single_chat_impl {
     ($ty:ident) => {
         self::export!($ty with_types_in self);
     };
@@ -1763,12 +1763,12 @@ macro_rules! __export_unified_chat_impl {
     };
 }
 #[doc(inline)]
-pub(crate) use __export_unified_chat_impl as export;
+pub(crate) use __export_single_chat_impl as export;
 #[cfg(target_arch = "wasm32")]
-#[link_section = "component-type:wit-bindgen:0.36.0:ntwk:theater:unified-chat:encoded world"]
+#[link_section = "component-type:wit-bindgen:0.36.0:ntwk:theater:single-chat:encoded world"]
 #[doc(hidden)]
-pub static __WIT_BINDGEN_COMPONENT_TYPE: [u8; 1817] = *b"\
-\0asm\x0d\0\x01\0\0\x19\x16wit-component-encoding\x04\0\x07\x96\x0d\x01A\x02\x01\
+pub static __WIT_BINDGEN_COMPONENT_TYPE: [u8; 1815] = *b"\
+\0asm\x0d\0\x01\0\0\x19\x16wit-component-encoding\x04\0\x07\x95\x0d\x01A\x02\x01\
 A\x1b\x01B\x0e\x01p}\x04\0\x04json\x03\0\0\x01p}\x04\0\x05state\x03\0\x02\x01s\x04\
 \0\x08actor-id\x03\0\x04\x01kw\x01r\x03\x0aevent-types\x06parent\x06\x04data\x01\
 \x04\0\x05event\x03\0\x07\x01r\x02\x04hashw\x05event\x08\x04\0\x0ameta-event\x03\
@@ -1810,9 +1810,9 @@ heater/actor\x05\x0e\x02\x03\0\0\x05state\x01B\x09\x02\x03\x02\x01\x0f\x04\0\x05
 state\x03\0\0\x02\x03\x02\x01\x08\x04\0\x0chttp-request\x03\0\x02\x02\x03\x02\x01\
 \x09\x04\0\x0dhttp-response\x03\0\x04\x01o\x02\x05\x01\x01@\x02\x03req\x03\x05st\
 ate\x01\0\x06\x04\0\x0ehandle-request\x01\x07\x04\0\x18ntwk:theater/http-server\x05\
-\x10\x04\0\x19ntwk:theater/unified-chat\x04\0\x0b\x12\x01\0\x0cunified-chat\x03\0\
-\0\0G\x09producers\x01\x0cprocessed-by\x02\x0dwit-component\x070.220.1\x10wit-bi\
-ndgen-rust\x060.36.0";
+\x10\x04\0\x18ntwk:theater/single-chat\x04\0\x0b\x11\x01\0\x0bsingle-chat\x03\0\0\
+\0G\x09producers\x01\x0cprocessed-by\x02\x0dwit-component\x070.220.1\x10wit-bind\
+gen-rust\x060.36.0";
 #[inline(never)]
 #[doc(hidden)]
 pub fn __link_custom_section_describing_imports() {

@@ -19,7 +19,7 @@ use serde_json::{json, Value};
 use sha1::{Digest, Sha1};
 use std::collections::HashMap;
 
-// Message types from chat-state
+// Message struct remains the same
 #[derive(Serialize, Deserialize, Debug, Clone)]
 struct Message {
     role: String,
@@ -29,26 +29,16 @@ struct Message {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-struct Chat {
-    title: String,
-    head: Option<String>,
-}
-
-// Anthropic specific types
-#[derive(Serialize, Deserialize, Debug, Clone)]
 struct AnthropicMessage {
     role: String,
     content: String,
 }
 
-// Combined state that includes all necessary data
+// Simplified state for single chat
 #[derive(Serialize, Deserialize, Debug, Clone)]
 struct State {
-    // Chat state
-    chat_directory: String,
-    // LLM Gateway state
+    head: Option<String>,
     api_key: String,
-    // Any additional state needed for UI
     connected_clients: HashMap<String, bool>,
 }
 
@@ -70,76 +60,25 @@ impl Message {
     }
 }
 
-// File system operations
+// Simplified file system operations
 impl State {
     fn save_message(&self, msg: &Message) -> Result<(), Box<dyn std::error::Error>> {
-        let path = format!("data/{}/{}.json", self.chat_directory, msg.id);
+        let path = format!("data/messages/{}.json", msg.id);
         let content = serde_json::to_string(&msg)?;
         write_file(&path, &content).unwrap();
         Ok(())
     }
 
     fn load_message(&self, id: &str) -> Result<Message, Box<dyn std::error::Error>> {
-        let path = format!("data/{}/{}.json", self.chat_directory, id);
+        let path = format!("data/messages/{}.json", id);
         let content = read_file(&path).unwrap();
         let msg: Message = serde_json::from_slice(&content)?;
         Ok(msg)
     }
 
-    fn save_chat(&self, chat: &Chat) -> Result<(), Box<dyn std::error::Error>> {
-        let path = format!("data/{}/{}.json", self.chat_directory, chat.title);
-        let content = serde_json::to_string(&chat)?;
-        write_file(&path, &content).unwrap();
-
-        let path = format!("data/{}/chats.txt", self.chat_directory);
-        let chats = read_file(&path).unwrap();
-        let mut chats: Vec<String> = serde_json::from_slice(&chats).unwrap_or(Vec::new());
-        if !chats.contains(&chat.title) {
-            chats.push(chat.title.clone());
-            write_file(&path, &serde_json::to_string(&chats)?).unwrap();
-        }
-        Ok(())
-    }
-
-    fn list_chats(&self) -> Result<Vec<Chat>, Box<dyn std::error::Error>> {
-        let path = format!("data/{}/chats.txt", self.chat_directory);
-        log(&format!("Reading chats from: {}", path));
-
-        // Read the list of chat titles
-        let chats = read_file(&path).unwrap();
-        let chat_titles: Vec<String> = serde_json::from_slice(&chats)?;
-        log(&format!("Found chat titles: {:?}", chat_titles));
-
-        let mut chat_list = Vec::new();
-        for title in chat_titles {
-            match self.read_chat(&title) {
-                Ok(chat) => {
-                    log(&format!("Successfully loaded chat: {}", title));
-                    chat_list.push(chat);
-                }
-                Err(e) => {
-                    log(&format!("Error loading chat {}: {}", title, e));
-                }
-            }
-        }
-
-        Ok(chat_list)
-    }
-
-    fn read_chat(&self, title: &str) -> Result<Chat, Box<dyn std::error::Error>> {
-        let path = format!("data/{}/{}.json", self.chat_directory, title);
-        log(&format!("Reading chat from: {}", path));
-        let content = read_file(&path).unwrap();
-        let chat: Chat = serde_json::from_slice(&content)?;
-        Ok(chat)
-    }
-
-    fn get_message_history(
-        &self,
-        message_id: &str,
-    ) -> Result<Vec<Message>, Box<dyn std::error::Error>> {
+    fn get_message_history(&self) -> Result<Vec<Message>, Box<dyn std::error::Error>> {
         let mut messages = Vec::new();
-        let mut current_id = Some(message_id.to_string());
+        let mut current_id = self.head.clone();
 
         while let Some(id) = current_id {
             let msg = self.load_message(&id)?;
@@ -151,7 +90,6 @@ impl State {
         Ok(messages)
     }
 
-    // LLM Gateway functionality
     fn generate_response(
         &self,
         messages: Vec<Message>,
@@ -195,18 +133,10 @@ impl State {
         Err("Failed to generate response".into())
     }
 
-    // Create necessary directories
+    // Ensure necessary directories exist
     fn ensure_directories(&self) -> Result<(), Box<dyn std::error::Error>> {
-        // Create main chat directory
-        let base_path = format!("data/{}", self.chat_directory);
-        create_dir(&base_path)?;
-
-        // Initialize chats.txt if it doesn't exist
-        let chats_path = format!("{}/chats.txt", base_path);
-        if !path_exists(&chats_path).expect("Failed to check path existence") {
-            write_file(&chats_path, &serde_json::to_string(&Vec::<String>::new())?).unwrap();
-        }
-
+        create_dir("data")?;
+        create_dir("data/messages")?;
         Ok(())
     }
 }
@@ -215,14 +145,14 @@ struct Component;
 
 impl ActorGuest for Component {
     fn init() -> Vec<u8> {
-        log("Initializing unified chat actor");
+        log("Initializing single chat actor");
 
         // Read API key
         let api_key = read_file("api-key.txt").unwrap();
         let api_key = String::from_utf8(api_key).unwrap().trim().to_string();
 
         let initial_state = State {
-            chat_directory: "chats".to_string(),
+            head: None,
             api_key,
             connected_clients: HashMap::new(),
         };
@@ -276,11 +206,10 @@ impl HttpGuest for Component {
                 )
             }
 
-            // API endpoints
-            ("GET", "/api/chats") => {
+            ("GET", "/api/messages") => {
                 let current_state: State = serde_json::from_slice(&state).unwrap();
-                match current_state.list_chats() {
-                    Ok(chats) => (
+                match current_state.get_message_history() {
+                    Ok(messages) => (
                         HttpResponse {
                             status: 200,
                             headers: vec![(
@@ -290,7 +219,7 @@ impl HttpGuest for Component {
                             body: Some(
                                 serde_json::to_vec(&json!({
                                     "status": "success",
-                                    "chats": chats
+                                    "messages": messages
                                 }))
                                 .unwrap(),
                             ),
@@ -301,99 +230,7 @@ impl HttpGuest for Component {
                         HttpResponse {
                             status: 500,
                             headers: vec![],
-                            body: Some(b"Failed to list chats".to_vec()),
-                        },
-                        state,
-                    ),
-                }
-            }
-
-            ("POST", "/api/chats") => {
-                let current_state: State = serde_json::from_slice(&state).unwrap();
-
-                if let Some(body) = req.body {
-                    if let Ok(data) = serde_json::from_slice::<Value>(&body) {
-                        if let Some(title) = data["title"].as_str() {
-                            let chat = Chat {
-                                title: title.to_string(),
-                                head: None,
-                            };
-
-                            if current_state.save_chat(&chat).is_ok() {
-                                return (
-                                    HttpResponse {
-                                        status: 200,
-                                        headers: vec![(
-                                            "Content-Type".to_string(),
-                                            "application/json".to_string(),
-                                        )],
-                                        body: Some(
-                                            serde_json::to_vec(&json!({
-                                                "status": "success",
-                                                "chat": chat
-                                            }))
-                                            .unwrap(),
-                                        ),
-                                    },
-                                    state,
-                                );
-                            }
-                        }
-                    }
-                }
-
-                (
-                    HttpResponse {
-                        status: 400,
-                        headers: vec![],
-                        body: Some(b"Invalid request".to_vec()),
-                    },
-                    state,
-                )
-            }
-
-            ("GET", path) if path.starts_with("/api/chats/") => {
-                let current_state: State = serde_json::from_slice(&state).unwrap();
-                let chat_id = path.trim_start_matches("/api/chats/");
-
-                match current_state.read_chat(chat_id) {
-                    Ok(chat) => {
-                        if let Some(head) = &chat.head {
-                            if let Ok(messages) = current_state.get_message_history(head) {
-                                return (
-                                    HttpResponse {
-                                        status: 200,
-                                        headers: vec![(
-                                            "Content-Type".to_string(),
-                                            "application/json".to_string(),
-                                        )],
-                                        body: Some(
-                                            serde_json::to_vec(&json!({
-                                                "status": "success",
-                                                "chat": chat,
-                                                "messages": messages
-                                            }))
-                                            .unwrap(),
-                                        ),
-                                    },
-                                    state,
-                                );
-                            }
-                        }
-                        (
-                            HttpResponse {
-                                status: 404,
-                                headers: vec![],
-                                body: Some(b"Chat messages not found".to_vec()),
-                            },
-                            state,
-                        )
-                    }
-                    Err(_) => (
-                        HttpResponse {
-                            status: 404,
-                            headers: vec![],
-                            body: Some(b"Chat not found".to_vec()),
+                            body: Some(b"Failed to load messages".to_vec()),
                         },
                         state,
                     ),
@@ -413,131 +250,83 @@ impl HttpGuest for Component {
     }
 }
 
-// Handle WebSocket messages for real-time updates
 impl WebSocketGuest for Component {
     fn handle_message(msg: WebsocketMessage, state: Json) -> (Json, WebsocketResponse) {
-        let current_state: State = serde_json::from_slice(&state).unwrap();
+        let mut current_state: State = serde_json::from_slice(&state).unwrap();
 
         match msg.ty {
             MessageType::Text => {
                 if let Some(text) = msg.text {
                     if let Ok(command) = serde_json::from_str::<Value>(&text) {
                         match command["type"].as_str() {
-                            Some("new_chat") => {
-                                if let Some(title) = command["title"].as_str() {
-                                    // Create new chat
-                                    let chat = Chat {
-                                        title: title.to_string(),
-                                        head: None,
-                                    };
-
-                                    // Save the chat
-                                    if current_state.save_chat(&chat).is_ok() {
-                                        // Get updated chat list
-                                        if let Ok(chats) = current_state.list_chats() {
-                                            log(&format!("Created new chat: {}", title));
-                                            // Send success response with updated chat list
-                                            return (
-                                                serde_json::to_vec(&current_state).unwrap(),
-                                                WebsocketResponse {
-                                                    messages: vec![WebsocketMessage {
-                                                        ty: MessageType::Text,
-                                                        text: Some(
-                                                            serde_json::json!({
-                                                                "status": "success",
-                                                                "type": "chat_update",
-                                                                "chats": chats
-                                                            })
-                                                            .to_string(),
-                                                        ),
-                                                        data: None,
-                                                    }],
-                                                },
-                                            );
-                                        }
-                                    }
-                                }
-                            }
                             Some("send_message") => {
-                                if let (Some(content), Some(chat_id)) =
-                                    (command["content"].as_str(), command["chat_id"].as_str())
-                                {
+                                if let Some(content) = command["content"].as_str() {
                                     // Create user message
-                                    let user_msg =
-                                        Message::new("user".to_string(), content.to_string(), None);
+                                    let user_msg = Message::new(
+                                        "user".to_string(),
+                                        content.to_string(),
+                                        current_state.head.clone(),
+                                    );
 
                                     if current_state.save_message(&user_msg).is_ok() {
-                                        // Update chat head
-                                        if let Ok(mut chat) = current_state.read_chat(chat_id) {
-                                            chat.head = Some(user_msg.id.clone());
-                                            current_state.save_chat(&chat).ok();
+                                        current_state.head = Some(user_msg.id.clone());
 
-                                            // Get message history for context
-                                            if let Ok(messages) =
-                                                current_state.get_message_history(&user_msg.id)
+                                        // Get message history for context
+                                        if let Ok(messages) = current_state.get_message_history() {
+                                            // Generate AI response
+                                            if let Ok(ai_response) =
+                                                current_state.generate_response(messages)
                                             {
-                                                // Generate AI response
-                                                if let Ok(ai_response) =
-                                                    current_state.generate_response(messages)
-                                                {
-                                                    let ai_msg = Message::new(
-                                                        "assistant".to_string(),
-                                                        ai_response,
-                                                        Some(user_msg.id.clone()),
-                                                    );
+                                                let ai_msg = Message::new(
+                                                    "assistant".to_string(),
+                                                    ai_response,
+                                                    Some(user_msg.id.clone()),
+                                                );
 
-                                                    if current_state.save_message(&ai_msg).is_ok() {
-                                                        chat.head = Some(ai_msg.id.clone());
-                                                        current_state.save_chat(&chat).ok();
+                                                if current_state.save_message(&ai_msg).is_ok() {
+                                                    current_state.head = Some(ai_msg.id.clone());
 
-                                                        // Broadcast update to all connected clients
-                                                        return (
-                                                            serde_json::to_vec(&current_state).unwrap(),
-                                                            WebsocketResponse {
-                                                                messages: vec![WebsocketMessage {
-                                                                    ty: MessageType::Text,
-                                                                    text: Some(serde_json::json!({
+                                                    // Send response with both messages
+                                                    return (
+                                                        serde_json::to_vec(&current_state).unwrap(),
+                                                        WebsocketResponse {
+                                                            messages: vec![WebsocketMessage {
+                                                                ty: MessageType::Text,
+                                                                text: Some(
+                                                                    serde_json::json!({
                                                                         "type": "message_update",
-                                                                        "chat_id": chat_id,
                                                                         "messages": [user_msg, ai_msg]
-                                                                    }).to_string()),
-                                                                    data: None,
-                                                                }]
-                                                            }
-                                                        );
-                                                    }
+                                                                    })
+                                                                    .to_string(),
+                                                                ),
+                                                                data: None,
+                                                            }],
+                                                        },
+                                                    );
                                                 }
                                             }
                                         }
                                     }
                                 }
                             }
-                            Some("get_all") => {
-                                log("Handling get_all command");
-                                match current_state.list_chats() {
-                                    Ok(chats) => {
-                                        log(&format!("Successfully listed {} chats", chats.len()));
-                                        return (
-                                            serde_json::to_vec(&current_state).unwrap(),
-                                            WebsocketResponse {
-                                                messages: vec![WebsocketMessage {
-                                                    ty: MessageType::Text,
-                                                    text: Some(
-                                                        serde_json::json!({
-                                                            "status": "success",
-                                                            "type": "chat_update",
-                                                            "chats": chats
-                                                        })
-                                                        .to_string(),
-                                                    ),
-                                                    data: None,
-                                                }],
-                                            },
-                                        );
-                                    }
-                                    Err(e) => {
-                                        log(&format!("Error listing chats: {}", e));
-                                    }
+                            Some("get_messages") => {
+                                if let Ok(messages) = current_state.get_message_history() {
+                                    return (
+                                        serde_json::to_vec(&current_state).unwrap(),
+                                        WebsocketResponse {
+                                            messages: vec![WebsocketMessage {
+                                                ty: MessageType::Text,
+                                                text: Some(
+                                                    serde_json::json!({
+                                                        "type": "message_update",
+                                                        "messages": messages
+                                                    })
+                                                    .to_string(),
+                                                ),
+                                                data: None,
+                                            }],
+                                        },
+                                    );
                                 }
                             }
                             _ => {
