@@ -12,6 +12,7 @@ use bindings::exports::ntwk::theater::websocket_server::{
 };
 use bindings::ntwk::theater::filesystem::{path_exists, read_file};
 use bindings::ntwk::theater::http_client::{send_http, HttpRequest};
+use bindings::ntwk::theater::message_server_host::{request, send};
 use bindings::ntwk::theater::runtime::log;
 use bindings::ntwk::theater::types::Json;
 use serde::{Deserialize, Serialize};
@@ -79,16 +80,13 @@ enum Action {
 
 impl State {
     fn save_message(&self, msg: &Message) -> Result<String, Box<dyn std::error::Error>> {
-        let request = Request {
+        let req = Request {
             _type: "request".to_string(),
             data: Action::Put(serde_json::to_vec(&msg)?),
         };
 
-        let request_bytes = serde_json::to_vec(&request)?;
-        let response_bytes = bindings::ntwk::theater::message_server_host::request(
-            &self.key_value_actor,
-            &request_bytes,
-        )?;
+        let request_bytes = serde_json::to_vec(&req)?;
+        let response_bytes = request(&self.key_value_actor, &request_bytes)?;
 
         let response: Value = serde_json::from_slice(&response_bytes)?;
         if response["status"].as_str() == Some("ok") {
@@ -102,16 +100,13 @@ impl State {
     }
 
     fn load_message(&self, id: &str) -> Result<Message, Box<dyn std::error::Error>> {
-        let request = Request {
+        let req = Request {
             _type: "request".to_string(),
             data: Action::Get(id.to_string()),
         };
 
-        let request_bytes = serde_json::to_vec(&request)?;
-        let response_bytes = bindings::ntwk::theater::message_server_host::request(
-            &self.key_value_actor,
-            &request_bytes,
-        )?;
+        let request_bytes = serde_json::to_vec(&req)?;
+        let response_bytes = request(&self.key_value_actor, &request_bytes)?;
 
         let response: Value = serde_json::from_slice(&response_bytes)?;
         if response["status"].as_str() == Some("ok") {
