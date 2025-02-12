@@ -86,12 +86,15 @@ function sendWebSocketMessage(message) {
 }
 
 function handleWebSocketMessage(data) {
+    // Handle full message history
     if (data.type === 'message_update' && data.messages) {
-        // Update message cache and render
+        // Clear and rebuild message cache
+        messageCache.clear();
         data.messages.forEach(msg => {
             messageCache.set(msg.id, msg);
         });
-        renderMessages(data.messages);
+        // Render all messages
+        renderMessages(Array.from(messageCache.values()));
     }
 }
 
@@ -124,7 +127,15 @@ async function sendMessage() {
 }
 
 function renderMessages(messages) {
-    if (messages.length === 0) {
+    // Sort messages by their sequence in the chat
+    const sortedMessages = messages.sort((a, b) => {
+        // If a message has a parent, it comes after that parent
+        if (a.parent === b.id) return 1;
+        if (b.parent === a.id) return -1;
+        return 0;
+    });
+
+    if (sortedMessages.length === 0) {
         messageArea.innerHTML = `
             <div class="empty-state">
                 No messages yet.<br>Start the conversation!
@@ -146,8 +157,8 @@ function renderMessages(messages) {
 
 // Message formatting
 function formatMessage(content) {
-    // First escape HTML
-    let text = escapeHtml(content);
+    // First escape HTML and convert newlines to <br>
+    let text = escapeHtml(content).replace(/\n/g, '<br>');
     
     // Format code blocks
     text = text.replace(/```([^`]+)```/g, (match, code) => `<pre><code>${code}</code></pre>`);
