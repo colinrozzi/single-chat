@@ -10,7 +10,7 @@ use bindings::exports::ntwk::theater::websocket_server::Guest as WebSocketGuest;
 use bindings::exports::ntwk::theater::websocket_server::{
     MessageType, WebsocketMessage, WebsocketResponse,
 };
-use bindings::ntwk::theater::filesystem::{create_dir, path_exists, read_file, write_file};
+use bindings::ntwk::theater::filesystem::{path_exists, read_file};
 use bindings::ntwk::theater::http_client::{send_http, HttpRequest};
 use bindings::ntwk::theater::runtime::log;
 use bindings::ntwk::theater::types::Json;
@@ -38,13 +38,6 @@ struct Chat {
     head: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-struct State {
-    chat: Chat,
-    api_key: String,
-    connected_clients: HashMap<String, bool>,
-}
-
 impl Message {
     fn new(role: String, content: String, parent: Option<String>) -> Self {
         let temp_msg = Self {
@@ -63,19 +56,53 @@ impl Message {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+struct State {
+    chat: Chat,
+    api_key: String,
+    connected_clients: HashMap<String, bool>,
+    key_value_actor: String, // Add this field
+}
+
 impl State {
     fn save_message(&self, msg: &Message) -> Result<(), Box<dyn std::error::Error>> {
-        let path = format!("data/messages/{}.json", msg.id);
-        let content = serde_json::to_string(&msg)?;
-        write_file(&path, &content).unwrap();
-        Ok(())
+        let request = Request {
+            _type: "request".to_string(),
+            data: Action::Put(serde_json::to_vec(&msg)?),
+        };
+
+        let request_bytes = serde_json::to_vec(&request)?;
+        if let Ok(response_bytes) = bindings::ntwk::theater::message_server_client::request(
+            &self.key_value_actor,
+            &request_bytes,
+        ) {
+            let response: Value = serde_json::from_slice(&response_bytes)?;
+            if response["status"] == "ok" {
+                return Ok(());
+            }
+        }
+        Err("Failed to save message".into())
     }
 
     fn load_message(&self, id: &str) -> Result<Message, Box<dyn std::error::Error>> {
-        let path = format!("data/messages/{}.json", id);
-        let content = read_file(&path).unwrap();
-        let msg: Message = serde_json::from_slice(&content)?;
-        Ok(msg)
+        let request = Request {
+            _type: "request".to_string(),
+            data: Action::Get(id.to_string()),
+        };
+
+        let request_bytes = serde_json::to_vec(&request)?;
+        if let Ok(response_bytes) = bindings::ntwk::theater::message_server_client::request(
+            &self.key_value_actor,
+            &request_bytes,
+        ) {
+            let response: Value = serde_json::from_slice(&response_bytes)?;
+            if response["status"] == "ok" {
+                if let Some(value) = response["value"].as_array() {
+                    return Ok(serde_json::from_slice(&value)?);
+                }
+            }
+        }
+        Err("Failed to load message".into())
     }
 
     fn get_message_history(&self) -> Result<Vec<Message>, Box<dyn std::error::Error>> {
@@ -92,14 +119,6 @@ impl State {
         Ok(messages)
     }
 
-    fn save_chat(&self) -> Result<(), Box<dyn std::error::Error>> {
-        create_dir("data/chats")?;
-        let path = "data/chats/chat.json";
-        let content = serde_json::to_string(&self.chat)?;
-        write_file(path, &content).unwrap();
-        Ok(())
-    }
-
     fn load_chat() -> Result<Chat, Box<dyn std::error::Error>> {
         let path = "data/chats/chat.json";
         if path_exists(path).unwrap_or(false) {
@@ -110,9 +129,8 @@ impl State {
         }
     }
 
-    fn update_head(&mut self, message_id: String) -> Result<(), Box<dyn std::error::Error>> {
-        self.chat.head = Some(message_id);
-        self.save_chat()
+    fn update_head(&mut self, message_id: String) -> () {
+        self.chat.head = Some(message_id)
     }
 
     fn generate_response(
@@ -157,13 +175,6 @@ impl State {
 
         Err("Failed to generate response".into())
     }
-
-    fn ensure_directories(&self) -> Result<(), Box<dyn std::error::Error>> {
-        create_dir("data")?;
-        create_dir("data/messages")?;
-        create_dir("data/chats")?;
-        Ok(())
-    }
 }
 
 struct Component;
@@ -183,11 +194,8 @@ impl ActorGuest for Component {
             chat,
             api_key,
             connected_clients: HashMap::new(),
+            key_value_actor: "key-value-store".to_string(),
         };
-
-        // Ensure directories exist
-        initial_state.ensure_directories().unwrap();
-        initial_state.save_chat().unwrap();
 
         serde_json::to_vec(&initial_state).unwrap()
     }
@@ -298,28 +306,24 @@ impl WebSocketGuest for Component {
                                     );
 
                                     if current_state.save_message(&user_msg).is_ok() {
-                                        if current_state.update_head(user_msg.id.clone()).is_ok() {
-                                            // Get message history for context
-                                            if let Ok(messages) =
-                                                current_state.get_message_history()
+                                        current_state.update_head(user_msg.id.clone());
+                                        // Get message history for context
+                                        if let Ok(messages) = current_state.get_message_history() {
+                                            // Generate AI response
+                                            if let Ok(ai_response) =
+                                                current_state.generate_response(messages)
                                             {
-                                                // Generate AI response
-                                                if let Ok(ai_response) =
-                                                    current_state.generate_response(messages)
-                                                {
-                                                    let ai_msg = Message::new(
-                                                        "assistant".to_string(),
-                                                        ai_response,
-                                                        Some(user_msg.id.clone()),
-                                                    );
+                                                let ai_msg = Message::new(
+                                                    "assistant".to_string(),
+                                                    ai_response,
+                                                    Some(user_msg.id.clone()),
+                                                );
 
-                                                    if current_state.save_message(&ai_msg).is_ok() {
-                                                        if current_state
-                                                            .update_head(ai_msg.id.clone())
-                                                            .is_ok()
-                                                        {
-                                                            // Send response with both messages
-                                                            return (
+                                                if current_state.save_message(&ai_msg).is_ok() {
+                                                    current_state.update_head(ai_msg.id.clone());
+
+                                                    // Send response with both messages
+                                                    return (
                                                                 serde_json::to_vec(&current_state).unwrap(),
                                                                 WebsocketResponse {
                                                                     messages: vec![WebsocketMessage {
@@ -335,8 +339,6 @@ impl WebSocketGuest for Component {
                                                                     }],
                                                                 },
                                                             );
-                                                        }
-                                                    }
                                                 }
                                             }
                                         }
