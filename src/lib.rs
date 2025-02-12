@@ -16,15 +16,15 @@ use bindings::ntwk::theater::runtime::log;
 use bindings::ntwk::theater::types::Json;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use sha1::{Digest, Sha1};
 use std::collections::HashMap;
 
+// Message struct changes - making id optional
 #[derive(Serialize, Deserialize, Debug, Clone)]
 struct Message {
     role: String,
     content: String,
     parent: Option<String>,
-    id: String,
+    id: Option<String>, // Now optional
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -40,19 +40,18 @@ struct Chat {
 
 impl Message {
     fn new(role: String, content: String, parent: Option<String>) -> Self {
-        let temp_msg = Self {
+        Self {
             role,
             content,
             parent,
-            id: String::new(),
-        };
+            id: None, // No ID until stored
+        }
+    }
 
-        let mut hasher = Sha1::new();
-        let temp_json = serde_json::to_string(&temp_msg).unwrap();
-        hasher.update(temp_json.as_bytes());
-        let id = format!("{:x}", hasher.finalize());
-
-        Self { id, ..temp_msg }
+    // Helper to create a message with ID (for after storage)
+    fn with_id(mut self, id: String) -> Self {
+        self.id = Some(id);
+        self
     }
 }
 
@@ -79,7 +78,7 @@ enum Action {
 }
 
 impl State {
-    fn save_message(&self, msg: &Message) -> Result<(), Box<dyn std::error::Error>> {
+    fn save_message(&self, msg: &Message) -> Result<String, Box<dyn std::error::Error>> {
         let request = Request {
             _type: "request".to_string(),
             data: Action::Put(serde_json::to_vec(&msg)?),
@@ -93,7 +92,10 @@ impl State {
 
         let response: Value = serde_json::from_slice(&response_bytes)?;
         if response["status"].as_str() == Some("ok") {
-            Ok(())
+            response["key"]
+                .as_str()
+                .map(|s| s.to_string())
+                .ok_or("No key in response".into())
         } else {
             Err("Failed to save message".into())
         }
@@ -114,13 +116,16 @@ impl State {
         let response: Value = serde_json::from_slice(&response_bytes)?;
         if response["status"].as_str() == Some("ok") {
             if let Some(value) = response.get("value") {
-                // The value should already be the serialized message bytes
-                let value_bytes = value.as_array().ok_or("Expected byte array")?;
-                let bytes: Vec<u8> = value_bytes
+                // The value should be an array of bytes that we can directly deserialize
+                let bytes = value
+                    .as_array()
+                    .ok_or("Expected byte array")?
                     .iter()
                     .map(|v| v.as_u64().unwrap_or(0) as u8)
-                    .collect();
-                return Ok(serde_json::from_slice(&bytes)?);
+                    .collect::<Vec<u8>>();
+                let mut msg: Message = serde_json::from_slice(&bytes)?;
+                msg.id = Some(id.to_string());
+                return Ok(msg);
             }
         }
         Err("Failed to load message".into())
@@ -150,8 +155,9 @@ impl State {
         }
     }
 
-    fn update_head(&mut self, message_id: String) -> () {
-        self.chat.head = Some(message_id)
+    fn update_head(&mut self, message_id: String) -> Result<(), Box<dyn std::error::Error>> {
+        self.chat.head = Some(message_id);
+        Ok(())
     }
 
     fn generate_response(
@@ -330,32 +336,46 @@ impl WebSocketGuest for Component {
                         match command["type"].as_str() {
                             Some("send_message") => {
                                 if let Some(content) = command["content"].as_str() {
-                                    // Create user message
+                                    // Create initial user message without ID
                                     let user_msg = Message::new(
                                         "user".to_string(),
                                         content.to_string(),
                                         current_state.chat.head.clone(),
                                     );
 
-                                    if current_state.save_message(&user_msg).is_ok() {
-                                        current_state.update_head(user_msg.id.clone());
-                                        // Get message history for context
-                                        if let Ok(messages) = current_state.get_message_history() {
-                                            // Generate AI response
-                                            if let Ok(ai_response) =
-                                                current_state.generate_response(messages)
+                                    // Save message and get its ID
+                                    if let Ok(msg_id) = current_state.save_message(&user_msg) {
+                                        if current_state.update_head(msg_id.clone()).is_ok() {
+                                            // Create final message with ID
+                                            let user_msg_with_id = user_msg.with_id(msg_id);
+
+                                            // Get message history for context
+                                            if let Ok(messages) =
+                                                current_state.get_message_history()
                                             {
-                                                let ai_msg = Message::new(
-                                                    "assistant".to_string(),
-                                                    ai_response,
-                                                    Some(user_msg.id.clone()),
-                                                );
+                                                // Generate AI response
+                                                if let Ok(ai_response) =
+                                                    current_state.generate_response(messages)
+                                                {
+                                                    let ai_msg = Message::new(
+                                                        "assistant".to_string(),
+                                                        ai_response,
+                                                        user_msg_with_id.id.clone(),
+                                                    );
 
-                                                if current_state.save_message(&ai_msg).is_ok() {
-                                                    current_state.update_head(ai_msg.id.clone());
+                                                    // Save AI message and get its ID
+                                                    if let Ok(ai_msg_id) =
+                                                        current_state.save_message(&ai_msg)
+                                                    {
+                                                        if current_state
+                                                            .update_head(ai_msg_id.clone())
+                                                            .is_ok()
+                                                        {
+                                                            let ai_msg_with_id =
+                                                                ai_msg.with_id(ai_msg_id);
 
-                                                    // Send response with both messages
-                                                    return (
+                                                            // Send response with both messages
+                                                            return (
                                                                 serde_json::to_vec(&current_state).unwrap(),
                                                                 WebsocketResponse {
                                                                     messages: vec![WebsocketMessage {
@@ -363,7 +383,7 @@ impl WebSocketGuest for Component {
                                                                         text: Some(
                                                                             serde_json::json!({
                                                                                 "type": "message_update",
-                                                                                "messages": [user_msg, ai_msg]
+                                                                                "messages": [user_msg_with_id, ai_msg_with_id]
                                                                             })
                                                                             .to_string(),
                                                                         ),
@@ -371,6 +391,8 @@ impl WebSocketGuest for Component {
                                                                     }],
                                                                 },
                                                             );
+                                                        }
+                                                    }
                                                 }
                                             }
                                         }
