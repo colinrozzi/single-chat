@@ -64,6 +64,20 @@ struct State {
     key_value_actor: String, // Add this field
 }
 
+// Import the Request/Action types - we'll need to define these since we can't import from key-value actor
+#[derive(Serialize, Deserialize, Debug)]
+struct Request {
+    _type: String,
+    data: Action,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+enum Action {
+    Get(String),
+    Put(Vec<u8>),
+    All(()),
+}
+
 impl State {
     fn save_message(&self, msg: &Message) -> Result<(), Box<dyn std::error::Error>> {
         let request = Request {
@@ -72,16 +86,16 @@ impl State {
         };
 
         let request_bytes = serde_json::to_vec(&request)?;
-        if let Ok(response_bytes) = bindings::ntwk::theater::message_server_client::request(
-            &self.key_value_actor,
-            &request_bytes,
-        ) {
-            let response: Value = serde_json::from_slice(&response_bytes)?;
-            if response["status"] == "ok" {
-                return Ok(());
-            }
+        let response_bytes = self
+            .message_client
+            .request(&self.key_value_actor, &request_bytes)?;
+
+        let response: Value = serde_json::from_slice(&response_bytes)?;
+        if response["status"].as_str() == Some("ok") {
+            Ok(())
+        } else {
+            Err("Failed to save message".into())
         }
-        Err("Failed to save message".into())
     }
 
     fn load_message(&self, id: &str) -> Result<Message, Box<dyn std::error::Error>> {
@@ -91,15 +105,15 @@ impl State {
         };
 
         let request_bytes = serde_json::to_vec(&request)?;
-        if let Ok(response_bytes) = bindings::ntwk::theater::message_server_client::request(
-            &self.key_value_actor,
-            &request_bytes,
-        ) {
-            let response: Value = serde_json::from_slice(&response_bytes)?;
-            if response["status"] == "ok" {
-                if let Some(value) = response["value"].as_array() {
-                    return Ok(serde_json::from_slice(&value)?);
-                }
+        let response_bytes = self
+            .message_client
+            .request(&self.key_value_actor, &request_bytes)?;
+
+        let response: Value = serde_json::from_slice(&response_bytes)?;
+        if response["status"].as_str() == Some("ok") {
+            if let Some(value) = response.get("value") {
+                let message_bytes = serde_json::from_slice::<Vec<u8>>(value)?;
+                return Ok(serde_json::from_slice(&message_bytes)?);
             }
         }
         Err("Failed to load message".into())
