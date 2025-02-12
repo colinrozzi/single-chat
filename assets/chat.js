@@ -235,6 +235,15 @@ document.addEventListener('DOMContentLoaded', () => {
             sendMessage();
         }
     });
+
+    // Add global keyboard shortcut for focusing the input
+    document.addEventListener('keydown', (event) => {
+        // Check if user is not already typing in the input
+        if (event.key === '/' && document.activeElement !== messageInput) {
+            event.preventDefault(); // Prevent the '/' from being typed
+            messageInput.focus();
+        }
+    });
 });
 
 // Handle visibility changes

@@ -169,7 +169,7 @@ impl State {
 struct Component;
 
 impl ActorGuest for Component {
-    fn init() -> Vec<u8> {
+    fn init(_data: Vec<u8>) -> Vec<u8> {
         log("Initializing single chat actor");
 
         // Read API key
