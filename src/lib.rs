@@ -86,9 +86,10 @@ impl State {
         };
 
         let request_bytes = serde_json::to_vec(&request)?;
-        let response_bytes = self
-            .message_client
-            .request(&self.key_value_actor, &request_bytes)?;
+        let response_bytes = bindings::ntwk::theater::message_server_host::request(
+            &self.key_value_actor,
+            &request_bytes,
+        )?;
 
         let response: Value = serde_json::from_slice(&response_bytes)?;
         if response["status"].as_str() == Some("ok") {
@@ -105,15 +106,17 @@ impl State {
         };
 
         let request_bytes = serde_json::to_vec(&request)?;
-        let response_bytes = self
-            .message_client
-            .request(&self.key_value_actor, &request_bytes)?;
+        let response_bytes = bindings::ntwk::theater::message_server_host::request(
+            &self.key_value_actor,
+            &request_bytes,
+        )?;
 
         let response: Value = serde_json::from_slice(&response_bytes)?;
         if response["status"].as_str() == Some("ok") {
             if let Some(value) = response.get("value") {
-                let message_bytes = serde_json::from_slice::<Vec<u8>>(value)?;
-                return Ok(serde_json::from_slice(&message_bytes)?);
+                if let Some(value_array) = value.as_array() {
+                    return Ok(serde_json::from_slice(&value_array)?);
+                }
             }
         }
         Err("Failed to load message".into())
