@@ -1,19 +1,24 @@
-# Unified Chat Actor
+# Single Chat Actor
 
 A self-contained WebAssembly actor that provides a complete LLM chat interface using Claude. This actor combines a chat interface, state management, and LLM integration into a single component.
 
 ## Features
 
 - 🌐 Complete web interface for chat interactions
-- 💾 Persistent chat history and state management
-- 🤖 Integration with Anthropic's Claude API
+  - Modern, responsive design
+  - Code block formatting with syntax highlighting
+  - Message actions (copy message ID, etc.)
+  - Real-time typing indicators
+  - Connection status display
+- 💾 Persistent chat history with linked message structure
+- 🤖 Integration with Anthropic's Claude API (using claude-3-5-sonnet-20241022)
 - 🔄 Real-time updates via WebSocket
 - 📱 Responsive design that works on all devices
 
 ## Quick Start
 
 1. Clone the repository
-2. Create an `api-key.txt` file in the root directory with your Anthropic API key
+2. Create an `api-key.txt` file in the assets directory with your Anthropic API key
 3. Build the actor:
 ```bash
 cargo build --release
@@ -29,7 +34,7 @@ theater run actor.toml
 ## Project Structure
 
 ```
-unified-chat/
+single-chat/
 ├── Cargo.toml              # Project configuration
 ├── actor.toml             # Actor manifest
 ├── src/
@@ -38,38 +43,55 @@ unified-chat/
 ├── assets/               # Web assets
 │   ├── index.html       # Main HTML file
 │   ├── styles.css       # CSS styles
-│   └── chat.js         # Frontend JavaScript
+│   ├── chat.js         # Frontend JavaScript
+│   └── api-key.txt     # Your Anthropic API key
 └── README.md            # This file
 ```
 
-## Features
+## Frontend Features
 
-### Frontend
-- Clean, modern interface
+### Interface
+- Clean, modern chat interface with message bubbles
 - Real-time message updates
-- Code block formatting
-- Responsive design
+- Code block formatting with syntax highlighting
+- Message actions (accessible by clicking messages)
 - Auto-expanding text input
 - Connection status indicator
+- Keyboard shortcuts (/ to focus input, Shift+Enter for new line)
 
-### Backend
-- Persistent chat history
+### User Experience
+- Responsive design that works on all screen sizes
+- Visual feedback for message states
+- Clear error handling
+- Persistent WebSocket connection with automatic reconnection
+- Loading states and typing indicators
+
+## Backend Features
+
+### Core Functionality
+- Persistent chat history using a key-value store
 - WebSocket for real-time updates
 - RESTful API endpoints
-- Claude integration
+- Claude 3.5 Sonnet integration
 - State management with verification
+- Linked message structure (each message references its parent)
+
+### Message Handling
+- Asynchronous message processing
+- Error handling and retry logic
+- Message ID generation and tracking
+- Parent-child message relationships
 
 ## API Endpoints
 
-- `GET /api/chats` - List all chats
-- `POST /api/chats` - Create a new chat
-- `GET /api/chats/:id` - Get chat details and messages
+- `GET /` - Serves the web interface
+- `GET /api/messages` - Get all messages in the chat
+- `WS /` - WebSocket endpoint for real-time updates
 
 ## WebSocket Events
 
-- `get_all` - Get all chats and messages
-- `new_chat` - Create a new chat
-- `send_message` - Send a message
+- `get_messages` - Request all messages
+- `send_message` - Send a new message
 - `message_update` - Receive message updates
 
 ## Configuration
@@ -77,10 +99,10 @@ unified-chat/
 The actor can be configured via `actor.toml`:
 
 ```toml
-name = "unified-chat"
+name = "single-chat"
 version = "0.1.0"
-description = "Unified LLM chat actor"
-component_path = "target/wasm32-wasi/release/unified_chat.wasm"
+description = "Single chat actor with Claude integration"
+component_path = "target/wasm32-wasi/release/single_chat.wasm"
 
 [interface]
 implements = "ntwk:theater/actor"
@@ -122,12 +144,13 @@ cargo test
 
 ## Architecture
 
-This actor combines several components into a single WebAssembly module:
+The actor combines several components into a single WebAssembly module:
 
 1. **HTTP Server**: Serves the web interface and handles API requests
-2. **WebSocket Server**: Provides real-time updates
-3. **State Management**: Handles chat history and persistence
-4. **LLM Integration**: Communicates with Claude for message generation
+2. **WebSocket Server**: Provides real-time updates and message handling
+3. **State Management**: Handles chat history using a linked message structure
+4. **LLM Integration**: Communicates with Claude 3.5 Sonnet for message generation
+5. **Message Actions**: Provides interaction capabilities for individual messages
 
 ### Data Flow
 
@@ -162,5 +185,6 @@ The actor includes several security features:
 - State verification
 - Secure WebSocket connections
 - API key protection
+- Message ID validation
 
 Please note that you should keep your `api-key.txt` secure and never commit it to version control.
