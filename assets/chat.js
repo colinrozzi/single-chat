@@ -3,6 +3,7 @@ let messageCache = new Map();
 let ws = null;
 let reconnectAttempts = 0;
 const MAX_RECONNECT_ATTEMPTS = 5;
+const WEBSOCKET_URL = 'ws://localhost:{{WEBSOCKET_PORT}}/';
 
 // UI Elements
 const messageInput = document.getElementById('messageInput');
@@ -41,9 +42,9 @@ function connectWebSocket() {
     updateConnectionStatus('connecting');
     
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = 'ws://localhost:8082/';
+    //const wsUrl = 'ws://localhost:8082/';
     
-    ws = new WebSocket(wsUrl);
+    ws = new WebSocket(WEBSOCKET_URL);
     
     ws.onopen = () => {
         console.log('WebSocket connected');

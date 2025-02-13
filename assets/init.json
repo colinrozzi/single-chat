@@ -1,4 +1,5 @@
 {
-	"head" : "851f0ad15b3dce33f5fec6ccb96e641bbcc908fe",
-	"key_value_actor" : "c1bd7681-299c-4f9c-8167-784e042f9e72"
+	"head" : "65540cda5b6b89ba5e60fce1f1d28373350ae63c",
+	"key_value_actor" : "d1315eed-e53c-4e08-93a1-dbee5e4b7ac5"
+	"websocket_port" : 8082
 }

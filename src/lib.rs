@@ -61,7 +61,8 @@ struct State {
     chat: Chat,
     api_key: String,
     connected_clients: HashMap<String, bool>,
-    key_value_actor: String, // Add this field
+    key_value_actor: String,
+    websocket_port: u16,
 }
 
 // Import the Request/Action types - we'll need to define these since we can't import from key-value actor
@@ -193,6 +194,7 @@ impl State {
 struct InitData {
     key_value_actor: String,
     head: Option<String>,
+    websocket_port: u16,
 }
 
 struct Component;
@@ -206,22 +208,37 @@ impl ActorGuest for Component {
         let init_data: InitData = serde_json::from_slice(&data).unwrap();
 
         log(&format!("Key value actor: {}", init_data.key_value_actor));
+        log(&format!("Head: {:?}", init_data.head));
+        log(&format!("Websocket port: {}", init_data.websocket_port));
 
         // Read API key
-        let api_key = read_file("api-key.txt").unwrap();
+        log("Reading API key");
+        let res = read_file("api-key.txt");
+        if res.is_err() {
+            log("Failed to read API key");
+            return vec![];
+        }
+        let api_key = res.unwrap();
+        log("API key read");
         let api_key = String::from_utf8(api_key).unwrap().trim().to_string();
+        log("API key loaded");
 
         // Load or create chat
         let chat = Chat {
             head: init_data.head,
         };
 
+        log("Chat loaded");
+
         let initial_state = State {
             chat,
             api_key,
             connected_clients: HashMap::new(),
             key_value_actor: init_data.key_value_actor,
+            websocket_port: init_data.websocket_port,
         };
+
+        log("State initialized");
 
         serde_json::to_vec(&initial_state).unwrap()
     }
@@ -255,7 +272,17 @@ impl HttpGuest for Component {
                 )
             }
             ("GET", "/chat.js") => {
-                let content = read_file("chat.js").unwrap();
+                let raw_content = read_file("chat.js").unwrap();
+                let str_content = String::from_utf8(raw_content).unwrap();
+                let content = str_content.replace(
+                    "{{WEBSOCKET_PORT}}",
+                    &format!(
+                        "{}",
+                        serde_json::from_slice::<State>(&state)
+                            .unwrap()
+                            .websocket_port
+                    ),
+                );
                 (
                     HttpResponse {
                         status: 200,
@@ -263,7 +290,7 @@ impl HttpGuest for Component {
                             "Content-Type".to_string(),
                             "application/javascript".to_string(),
                         )],
-                        body: Some(content),
+                        body: Some(content.into()),
                     },
                     state,
                 )
