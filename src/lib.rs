@@ -61,7 +61,7 @@ struct State {
     chat: Chat,
     api_key: String,
     connected_clients: HashMap<String, bool>,
-    store_actor: String,
+    store_id: String,
     websocket_port: u16,
 }
 
@@ -87,7 +87,7 @@ impl State {
         };
 
         let request_bytes = serde_json::to_vec(&req)?;
-        let response_bytes = request(&self.store_actor, &request_bytes)?;
+        let response_bytes = request(&self.store_id, &request_bytes)?;
 
         let response: Value = serde_json::from_slice(&response_bytes)?;
         if response["status"].as_str() == Some("ok") {
@@ -107,7 +107,7 @@ impl State {
         };
 
         let request_bytes = serde_json::to_vec(&req)?;
-        let response_bytes = request(&self.store_actor, &request_bytes)?;
+        let response_bytes = request(&self.store_id, &request_bytes)?;
 
         let response: Value = serde_json::from_slice(&response_bytes)?;
         if response["status"].as_str() == Some("ok") {
@@ -192,7 +192,7 @@ impl State {
 
 #[derive(Serialize, Deserialize, Debug)]
 struct InitData {
-    store_actor: String,
+    store_id: String,
     head: Option<String>,
     websocket_port: u16,
 }
@@ -207,7 +207,7 @@ impl ActorGuest for Component {
 
         let init_data: InitData = serde_json::from_slice(&data).unwrap();
 
-        log(&format!("Key value actor: {}", init_data.store_actor));
+        log(&format!("Store actor id: {}", init_data.store_id));
         log(&format!("Head: {:?}", init_data.head));
         log(&format!("Websocket port: {}", init_data.websocket_port));
 
@@ -234,7 +234,7 @@ impl ActorGuest for Component {
             chat,
             api_key,
             connected_clients: HashMap::new(),
-            store_actor: init_data.store_actor,
+            store_id: init_data.store_id,
             websocket_port: init_data.websocket_port,
         };
 
