@@ -122,6 +122,17 @@ body {
     margin-bottom: 0.5rem;
     line-height: 1.4;
     word-wrap: break-word;
+    position: relative;
+    cursor: pointer;
+    transition: filter 0.2s;
+}
+
+.message:hover {
+    filter: brightness(0.95);
+}
+
+.message.selected {
+    filter: brightness(0.9);
 }
 
 .message.user {
@@ -136,6 +147,49 @@ body {
     color: var(--gray-800);
     margin-right: auto;
     border-bottom-left-radius: 0.25rem;
+}
+
+/* Message actions */
+.message-actions {
+    display: none;
+    position: absolute;
+    bottom: -2.5rem;
+    left: 50%;
+    transform: translateX(-50%);
+    background: white;
+    border-radius: 0.5rem;
+    padding: 0.25rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    z-index: 10;
+    border: 1px solid var(--gray-200);
+}
+
+.message.selected .message-actions {
+    display: flex;
+    gap: 0.25rem;
+}
+
+.message-action-button {
+    padding: 0.25rem 0.5rem;
+    border: none;
+    background: var(--gray-100);
+    color: var(--gray-800);
+    border-radius: 0.25rem;
+    font-size: 0.75rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    transition: background-color 0.2s;
+}
+
+.message-action-button:hover {
+    background: var(--gray-200);
+}
+
+.message-action-button svg {
+    width: 12px;
+    height: 12px;
 }
 
 /* Typing indicator */

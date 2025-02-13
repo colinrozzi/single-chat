@@ -2,6 +2,7 @@
 let messageCache = new Map();
 let ws = null;
 let reconnectAttempts = 0;
+let selectedMessageId = null;
 const MAX_RECONNECT_ATTEMPTS = 5;
 const WEBSOCKET_URL = 'ws://localhost:{{WEBSOCKET_PORT}}/';
 
@@ -42,7 +43,6 @@ function connectWebSocket() {
     updateConnectionStatus('connecting');
     
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    //const wsUrl = 'ws://localhost:8082/';
     
     ws = new WebSocket(WEBSOCKET_URL);
     
@@ -163,6 +163,43 @@ async function sendMessage() {
     }
 }
 
+// Message actions
+function handleMessageClick(event) {
+    const messageElement = event.target.closest('.message');
+    if (!messageElement) return;
+
+    // Don't trigger if clicking action button
+    if (event.target.closest('.message-action-button')) return;
+
+    const messageId = messageElement.dataset.id;
+    
+    // If clicking the same message, deselect it
+    if (selectedMessageId === messageId) {
+        selectedMessageId = null;
+    } else {
+        selectedMessageId = messageId;
+    }
+    renderMessages([...messageCache.values()], false);
+}
+
+function copyMessageId(messageId, button) {
+    navigator.clipboard.writeText(messageId)
+        .then(() => {
+            // Store the original text
+            const originalText = button.textContent;
+            // Update the button text
+            button.textContent = 'Copied!';
+            // Reset after 1 second
+            setTimeout(() => {
+                button.textContent = originalText;
+            }, 1000);
+        })
+        .catch(err => {
+            console.error('Failed to copy message ID:', err);
+            alert('Failed to copy message ID');
+        });
+}
+
 function renderMessages(messages, isTyping = false) {
     // Sort messages by their sequence in the chat
     const sortedMessages = messages.sort((a, b) => {
@@ -184,8 +221,17 @@ function renderMessages(messages, isTyping = false) {
     messageArea.innerHTML = `
         <div class="message-container">
             ${sortedMessages.map(msg => `
-                <div class="message ${msg.role}" data-id="${msg.id}">
+                <div class="message ${msg.role} ${msg.id === selectedMessageId ? 'selected' : ''}" 
+                     data-id="${msg.id}">
                     ${formatMessage(msg.content)}
+                    <div class="message-actions">
+                        <button class="message-action-button copy-button">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                <path d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                            Copy ID
+                        </button>
+                    </div>
                 </div>
             `).join('')}
             ${isTyping ? `
@@ -197,6 +243,23 @@ function renderMessages(messages, isTyping = false) {
             ` : ''}
         </div>
     `;
+
+    // Set up event listeners for action buttons
+    messageArea.querySelectorAll('.message').forEach(messageElement => {
+        const messageId = messageElement.dataset.id;
+        const copyButton = messageElement.querySelector('.copy-button');
+        
+        // Message click event
+        messageElement.addEventListener('click', handleMessageClick);
+        
+        // Copy button click event
+        if (copyButton) {
+            copyButton.addEventListener('click', (event) => {
+                event.stopPropagation();
+                copyMessageId(messageId, copyButton);
+            });
+        }
+    });
 
     messageArea.scrollTop = messageArea.scrollHeight;
 }
@@ -224,6 +287,14 @@ function escapeHtml(unsafe) {
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#039;");
 }
+
+// Handle clicks outside messages
+document.addEventListener('click', (event) => {
+    if (!event.target.closest('.message')) {
+        selectedMessageId = null;
+        renderMessages([...messageCache.values()], false);
+    }
+});
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
