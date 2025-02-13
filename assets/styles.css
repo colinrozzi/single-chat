@@ -112,6 +112,7 @@ body {
 .message-container {
     display: flex;
     flex-direction: column;
+    position: relative; /* Added for z-index context */
 }
 
 /* Message bubbles */
@@ -119,7 +120,7 @@ body {
     max-width: 85%;
     padding: 0.75rem 1rem;
     border-radius: 1rem;
-    margin-bottom: 0.5rem;
+    margin-bottom: 2rem; /* Increased to make room for actions */
     line-height: 1.4;
     word-wrap: break-word;
     position: relative;
@@ -160,7 +161,7 @@ body {
     border-radius: 0.5rem;
     padding: 0.25rem;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    z-index: 10;
+    z-index: 100; /* Increased z-index */
     border: 1px solid var(--gray-200);
 }
 
@@ -181,6 +182,7 @@ body {
     align-items: center;
     gap: 0.25rem;
     transition: background-color 0.2s;
+    z-index: 101; /* Even higher z-index for the button */
 }
 
 .message-action-button:hover {
@@ -235,6 +237,7 @@ body {
     background: white;
     border-top: 1px solid var(--gray-200);
     box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05);
+    z-index: 50; /* Added z-index to ensure it's above messages */
 }
 
 .input-container {
