@@ -61,11 +61,11 @@ struct State {
     chat: Chat,
     api_key: String,
     connected_clients: HashMap<String, bool>,
-    key_value_actor: String,
+    store_actor: String,
     websocket_port: u16,
 }
 
-// Import the Request/Action types - we'll need to define these since we can't import from key-value actor
+// Import the Request/Action types - we'll need to define these since we can't import from store actor
 #[derive(Serialize, Deserialize, Debug)]
 struct Request {
     _type: String,
@@ -87,7 +87,7 @@ impl State {
         };
 
         let request_bytes = serde_json::to_vec(&req)?;
-        let response_bytes = request(&self.key_value_actor, &request_bytes)?;
+        let response_bytes = request(&self.store_actor, &request_bytes)?;
 
         let response: Value = serde_json::from_slice(&response_bytes)?;
         if response["status"].as_str() == Some("ok") {
@@ -107,7 +107,7 @@ impl State {
         };
 
         let request_bytes = serde_json::to_vec(&req)?;
-        let response_bytes = request(&self.key_value_actor, &request_bytes)?;
+        let response_bytes = request(&self.store_actor, &request_bytes)?;
 
         let response: Value = serde_json::from_slice(&response_bytes)?;
         if response["status"].as_str() == Some("ok") {
@@ -192,7 +192,7 @@ impl State {
 
 #[derive(Serialize, Deserialize, Debug)]
 struct InitData {
-    key_value_actor: String,
+    store_actor: String,
     head: Option<String>,
     websocket_port: u16,
 }
@@ -207,7 +207,7 @@ impl ActorGuest for Component {
 
         let init_data: InitData = serde_json::from_slice(&data).unwrap();
 
-        log(&format!("Key value actor: {}", init_data.key_value_actor));
+        log(&format!("Key value actor: {}", init_data.store_actor));
         log(&format!("Head: {:?}", init_data.head));
         log(&format!("Websocket port: {}", init_data.websocket_port));
 
@@ -234,7 +234,7 @@ impl ActorGuest for Component {
             chat,
             api_key,
             connected_clients: HashMap::new(),
-            key_value_actor: init_data.key_value_actor,
+            store_actor: init_data.store_actor,
             websocket_port: init_data.websocket_port,
         };
 
