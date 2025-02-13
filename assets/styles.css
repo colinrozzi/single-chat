@@ -112,7 +112,6 @@ body {
 .message-container {
     display: flex;
     flex-direction: column;
-    position: relative; /* Added for z-index context */
 }
 
 /* Message bubbles */
@@ -120,7 +119,7 @@ body {
     max-width: 85%;
     padding: 0.75rem 1rem;
     border-radius: 1rem;
-    margin-bottom: 2rem; /* Increased to make room for actions */
+    margin-bottom: 0.5rem;
     line-height: 1.4;
     word-wrap: break-word;
     position: relative;
@@ -153,16 +152,13 @@ body {
 /* Message actions */
 .message-actions {
     display: none;
-    position: absolute;
-    bottom: -2.5rem;
-    left: 50%;
-    transform: translateX(-50%);
-    background: white;
-    border-radius: 0.5rem;
-    padding: 0.25rem;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    z-index: 100; /* Increased z-index */
-    border: 1px solid var(--gray-200);
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.message.assistant .message-actions {
+    border-top-color: rgba(0, 0, 0, 0.1);
 }
 
 .message.selected .message-actions {
@@ -173,8 +169,8 @@ body {
 .message-action-button {
     padding: 0.25rem 0.5rem;
     border: none;
-    background: var(--gray-100);
-    color: var(--gray-800);
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
     border-radius: 0.25rem;
     font-size: 0.75rem;
     cursor: pointer;
@@ -182,11 +178,19 @@ body {
     align-items: center;
     gap: 0.25rem;
     transition: background-color 0.2s;
-    z-index: 101; /* Even higher z-index for the button */
+}
+
+.message.assistant .message-action-button {
+    background: rgba(0, 0, 0, 0.05);
+    color: var(--gray-800);
 }
 
 .message-action-button:hover {
-    background: var(--gray-200);
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.message.assistant .message-action-button:hover {
+    background: rgba(0, 0, 0, 0.1);
 }
 
 .message-action-button svg {
@@ -237,7 +241,6 @@ body {
     background: white;
     border-top: 1px solid var(--gray-200);
     box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05);
-    z-index: 50; /* Added z-index to ensure it's above messages */
 }
 
 .input-container {
